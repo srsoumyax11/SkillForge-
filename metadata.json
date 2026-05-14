@@ -1,0 +1,8 @@
+{
+  "name": "SkillForge AI Academy",
+  "description": "A premium AI-learning platform featuring courses, certifications, and a modern learning dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

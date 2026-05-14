@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information and role.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "instructor", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Educational course metadata.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "instructorId": { "type": "string" },
+        "instructorName": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["beginner", "intermediate", "advanced"] },
+        "duration": { "type": "string" },
+        "rating": { "type": "number" },
+        "enrollmentsCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "instructorId", "price"]
+    },
+    "Module": {
+      "title": "Module",
+      "description": "A collection of lessons within a course.",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "order": { "type": "integer" }
+      },
+      "required": ["courseId", "title", "order"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "Individual learning unit.",
+      "type": "object",
+      "properties": {
+        "moduleId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "order": { "type": "integer" },
+        "isFreePreview": { "type": "boolean" }
+      },
+      "required": ["moduleId", "courseId", "title", "order"]
+    },
+    "Progress": {
+      "title": "Progress",
+      "description": "Student's progress in a course.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "completedLessons": { "type": "array", "items": { "type": "string" } },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "courseId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "Global user profiles" },
+    "/courses/{courseId}": { "schema": "Course", "description": "Courses marketplace" },
+    "/courses/{courseId}/modules/{moduleId}": { "schema": "Module", "description": "Course structure" },
+    "/courses/{courseId}/modules/{moduleId}/lessons/{lessonId}": { "schema": "Lesson", "description": "Course content" },
+    "/progress/{progressId}": { "schema": "Progress", "description": "User learning progress" }
+  }
+}
