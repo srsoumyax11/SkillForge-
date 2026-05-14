@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress as UIProgress } from "@/components/ui/progress";
-import { collection, onSnapshot, query, where, doc, getDoc } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/lib/firebase";
+import api from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 
 interface EnrolledCourse {
@@ -27,43 +26,18 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
-      collection(db, "progress"),
-      where("userId", "==", user.uid)
-    );
+    const fetchEnrollments = async () => {
+      try {
+        const response = await api.get("/enrollments");
+        setEnrolledCourses(response.data);
+      } catch (error) {
+        console.error("Failed to fetch enrollments", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const coursesPromises = snapshot.docs.map(async (progressDoc) => {
-        const data = progressDoc.data();
-        const courseDoc = await getDoc(doc(db, "courses", data.courseId));
-        
-        if (courseDoc.exists()) {
-          const courseData = courseDoc.data();
-          // Calculate progress percentage based on completed lessons (placeholder logic)
-          const completedCount = (data.completedLessons || []).length;
-          const totalLessons = 10; // Placeholder
-          const progressPercent = Math.min(Math.round((completedCount / totalLessons) * 100), 100);
-
-          return {
-            id: courseDoc.id,
-            title: courseData.title,
-            progress: progressPercent,
-            lastAccessed: data.updatedAt ? new Date(data.updatedAt).toLocaleDateString() : "Just now",
-            thumbnail: courseData.thumbnail || "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=400"
-          };
-        }
-        return null;
-      });
-
-      const resolvedCourses = (await Promise.all(coursesPromises)).filter(c => c !== null) as EnrolledCourse[];
-      setEnrolledCourses(resolvedCourses);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "progress");
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchEnrollments();
   }, [user]);
 
   return (

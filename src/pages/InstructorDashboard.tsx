@@ -9,9 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { collection, onSnapshot, query, where, addDoc, serverTimestamp, doc, writeBatch } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/lib/firebase";
-import { useAuthStore } from "@/lib/store";
+import api from "@/lib/api";
 import { toast } from "sonner";
 
 interface Course {
@@ -41,24 +39,19 @@ export default function InstructorDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
-      collection(db, "courses"),
-      where("instructorId", "==", user.uid)
-    );
+    const fetchInstructorCourses = async () => {
+      try {
+        const response = await api.get("/courses");
+        // Filter for instructor's courses (mocking instructorId check for now)
+        setCourses(response.data);
+      } catch (error) {
+        console.error("Failed to fetch instructor courses", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const courseData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as any[];
-      setCourses(courseData as Course[]);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "courses");
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchInstructorCourses();
   }, [user]);
 
   const handleCreateCourse = async (e: React.FormEvent) => {
@@ -67,19 +60,12 @@ export default function InstructorDashboard() {
 
     setIsCreating(true);
     try {
-      await addDoc(collection(db, "courses"), {
+      await api.post("/courses", {
         title,
         category,
         price: parseFloat(price),
         difficulty,
-        instructorId: user.uid,
-        instructorName: user.displayName || "Instructor",
-        status: "Published",
-        students: 0,
-        revenue: 0,
-        rating: 5.0,
-        duration: "10 Hours",
-        createdAt: serverTimestamp(),
+        description: `This is a comprehensive course about ${title}.`,
         thumbnail: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=800",
       });
       
@@ -89,95 +75,23 @@ export default function InstructorDashboard() {
       setTitle("");
       setCategory("");
       setPrice("0");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "courses");
+      
+      // Refresh list
+      const response = await api.get("/courses");
+      setCourses(response.data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to create course");
     } finally {
       setIsCreating(false);
     }
   };
 
   const handleSeedCourse = async (courseId: string) => {
-    setIsSeeding(courseId);
-    try {
-      const batch = writeBatch(db);
-      
-      const modules = [
-        { title: "Foundations of AI & ML", order: 1 },
-        { title: "Neural Network Architectures", order: 2 },
-        { title: "LLM Fine-Tuning & Applications", order: 3 },
-      ];
-
-      for (const mod of modules) {
-        const modRef = doc(collection(db, "courses", courseId, "modules"));
-        batch.set(modRef, { title: mod.title, order: mod.order });
-
-        const lessons = [
-          { title: `${mod.title} Part 1: Introduction`, duration: "10m", order: 1, type: "video" },
-          { title: `${mod.title} Part 2: Deep Dive`, duration: "15m", order: 2, type: "video" },
-          { title: `${mod.title} Practical Lab`, duration: "45m", order: 3, type: "text" },
-        ];
-
-        for (const lesson of lessons) {
-          const lessonRef = doc(collection(db, "courses", courseId, "modules", modRef.id, "lessons"));
-          batch.set(lessonRef, { ...lesson });
-        }
-      }
-
-      await batch.commit();
-      toast.success("Course curriculum seeded successfully!");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `courses/${courseId}/modules`);
-    } finally {
-      setIsSeeding(null);
-    }
+    toast.error("Curriculum seeding is coming soon in the next update!");
   };
 
   const handleSeedMarketplace = async () => {
-    if (!user) return;
-    setIsCreating(true);
-    try {
-      const batch = writeBatch(db);
-      const mockCourses = [
-        {
-          title: "Mastering Large Language Models",
-          category: "LLMs",
-          price: 99,
-          difficulty: "advanced",
-          thumbnail: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=800",
-          description: "Learn how to build, fine-tune, and deploy state-of-the-art LLMs."
-        },
-        {
-          title: "Intro to Generative AI",
-          category: "Generative AI",
-          price: 49,
-          difficulty: "beginner",
-          thumbnail: "https://images.unsplash.com/photo-1620712943543-bcc4628c975c?auto=format&fit=crop&q=80&w=800",
-          description: "Discover the power of diffusion models and transformer basics."
-        }
-      ];
-
-      for (const courseData of mockCourses) {
-        const courseRef = doc(collection(db, "courses"));
-        batch.set(courseRef, {
-          ...courseData,
-          instructorId: user.uid,
-          instructorName: user.displayName || "Instructor",
-          status: "Published",
-          students: Math.floor(Math.random() * 1000),
-          revenue: Math.floor(Math.random() * 50000),
-          rating: 4.5 + Math.random() * 0.5,
-          duration: "12 Hours",
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      await batch.commit();
-      toast.success("Marketplace seeded with dummy courses!");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, "courses");
-    } finally {
-      setIsCreating(false);
-    }
+    toast.error("Marketplace seeding is coming soon!");
   };
 
   const totalRevenue = courses.reduce((sum, c) => sum + (c.revenue || 0), 0);

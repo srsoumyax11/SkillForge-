@@ -1,11 +1,17 @@
 import { create } from 'zustand';
-import { User } from 'firebase/auth';
+
+interface LocalUser {
+  id: string;
+  email: string;
+  displayName?: string;
+  role: string;
+}
 
 interface AuthState {
-  user: User | null;
+  user: LocalUser | null;
   profile: any | null;
   loading: boolean;
-  setUser: (user: User | null) => void;
+  setUser: (user: LocalUser | null) => void;
   setProfile: (profile: any | null) => void;
   setLoading: (loading: boolean) => void;
 }

@@ -16,20 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  orderBy, 
-  where, 
-  updateDoc, 
-  arrayUnion, 
-  arrayRemove,
-  onSnapshot 
-} from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/lib/firebase";
+import api from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 import AILab from "@/components/AILab";
 import { toast } from "sonner";
@@ -69,30 +56,22 @@ export default function LessonPlayer() {
 
     const fetchData = async () => {
       try {
-        const courseDoc = await getDoc(doc(db, "courses", id));
-        if (courseDoc.exists()) {
-          setCourseTitle(courseDoc.data().title);
-        }
-
-        // Fetch modules and lessons
-        const modsRes = await getDocs(query(collection(db, "courses", id, "modules"), orderBy("order", "asc")));
-        const modsData = await Promise.all(modsRes.docs.map(async (mDoc) => {
-          const lessonsRes = await getDocs(query(collection(db, "courses", id, "modules", mDoc.id, "lessons"), orderBy("order", "asc")));
-          return {
-            id: mDoc.id,
-            ...mDoc.data(),
-            lessons: lessonsRes.docs.map(lDoc => ({ id: lDoc.id, moduleId: mDoc.id, ...lDoc.data() }))
-          } as Module;
-        }));
-
-        setModules(modsData);
+        const response = await api.get(`/courses/${id}`);
+        setCourseTitle(response.data.title);
         
-        // Initial current lesson
-        if (modsData.length > 0 && modsData[0].lessons.length > 0) {
-          setCurrentLesson(modsData[0].lessons[0]);
-        }
+        // Mock modules and lessons for now
+        const mockLessons: Lesson[] = [
+          { id: "l1", title: "Introduction to AI", type: "video", content: "", duration: "10:00", order: 1, moduleId: "m1" },
+          { id: "l2", title: "Neural Networks Overview", type: "video", content: "", duration: "15:00", order: 2, moduleId: "m1" }
+        ];
+        const mockModules: Module[] = [
+          { id: "m1", title: "Foundations", order: 1, lessons: mockLessons }
+        ];
+        setModules(mockModules);
+        setCurrentLesson(mockLessons[0]);
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `courses/${id}`);
+        console.error("Failed to fetch lesson data", error);
+        navigate(`/course/${id}`);
       } finally {
         setLoading(false);
       }
@@ -100,41 +79,34 @@ export default function LessonPlayer() {
 
     fetchData();
 
-    // Fetch progress
-    const q = query(
-      collection(db, "progress"),
-      where("userId", "==", user.uid),
-      where("courseId", "==", id)
-    );
-
-    const unsubscribeProgress = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const progDoc = snapshot.docs[0];
-        setProgressId(progDoc.id);
-        setCompletedLessons(progDoc.data().completedLessons || []);
-      } else {
-        // Not enrolled? Should redirect
-        toast.error("You are not enrolled in this course");
-        navigate(`/course/${id}`);
+    const checkEnrollment = async () => {
+      try {
+        const response = await api.get("/enrollments");
+        const enrollment = response.data.find((e: any) => e.courseId === id);
+        if (enrollment) {
+          setProgressId(enrollment.id);
+          // Progress data would come from the enrollment record in a real app
+          setCompletedLessons([]); 
+        } else {
+          toast.error("You are not enrolled in this course");
+          navigate(`/course/${id}`);
+        }
+      } catch (error) {
+        console.error("Enrollment check failed", error);
       }
-    });
+    };
 
-    return () => unsubscribeProgress();
+    checkEnrollment();
   }, [id, user, navigate]);
 
   const toggleLessonComplete = async (lessonId: string) => {
     if (!progressId) return;
 
     const isCompleted = completedLessons.includes(lessonId);
-    try {
-      await updateDoc(doc(db, "progress", progressId), {
-        completedLessons: isCompleted ? arrayRemove(lessonId) : arrayUnion(lessonId),
-        updatedAt: new Date().toISOString()
-      });
-      toast.success(isCompleted ? "Lesson marked as incomplete" : "Lesson completed!");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `progress/${progressId}`);
-    }
+    setCompletedLessons(prev => 
+      isCompleted ? prev.filter(id => id !== lessonId) : [...prev, lessonId]
+    );
+    toast.success(isCompleted ? "Lesson marked as incomplete" : "Lesson completed!");
   };
 
   const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);

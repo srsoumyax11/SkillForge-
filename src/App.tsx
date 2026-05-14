@@ -4,10 +4,8 @@
  */
 
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db, testConnection, handleFirestoreError, OperationType } from './lib/firebase';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import api from './lib/api';
 import { useAuthStore } from './lib/store';
 import { Toaster } from './components/ui/sonner';
 
@@ -28,30 +26,20 @@ import Footer from './components/layout/Footer';
 
 export default function App() {
   const { setUser, setProfile, setLoading } = useAuthStore();
-  const initialized = useEffect(() => {
-    testConnection();
-  }, []);
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            setProfile(userDoc.data());
-          }
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-        }
-      } else {
-        setProfile(null);
+    const checkAuth = async () => {
+      try {
+        const response = await api.get("/auth/me");
+        setUser(response.data.user);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, [setUser, setProfile, setLoading]);
+    checkAuth();
+  }, [setUser, setLoading]);
 
   return (
     <Router>

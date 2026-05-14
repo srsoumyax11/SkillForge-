@@ -1,9 +1,7 @@
-import * as React from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
-import { auth, db, handleFirestoreError, OperationType } from "@/lib/firebase";
+import api from "@/lib/api";
+import { useAuthStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,35 +13,19 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { setUser } = useAuthStore();
   const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      await updateProfile(user, { displayName: name });
-      
-      const userPath = `users/${user.uid}`;
-      try {
-        // Save user to firestore
-        await setDoc(doc(db, "users", user.uid), {
-          email,
-          displayName: name,
-          role: "student",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, userPath);
-      }
-
+      const response = await api.post("/auth/register", { email, password, displayName: name });
+      setUser(response.data.user);
       toast.success("Account created successfully!");
       navigate("/dashboard");
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.error || "Registration failed");
     } finally {
       setIsLoading(false);
     }

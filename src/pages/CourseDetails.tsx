@@ -6,8 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot, orderBy } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/lib/firebase";
+import api from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 import { toast } from "sonner";
 
@@ -57,24 +56,12 @@ export default function CourseDetails() {
 
     const fetchCourseData = async () => {
       try {
-        const courseDoc = await getDoc(doc(db, "courses", id));
-        if (courseDoc.exists()) {
-          setCourse({ id: courseDoc.id, ...courseDoc.data() } as Course);
-          
-          // Fetch modules (subcollection)
-          const modulesSnapshot = await getDocs(query(collection(db, "courses", id, "modules"), orderBy("order", "asc")));
-          const modulesData = await Promise.all(modulesSnapshot.docs.map(async (modDoc) => {
-            const lessonsSnapshot = await getDocs(query(collection(db, "courses", id, "modules", modDoc.id, "lessons"), orderBy("order", "asc")));
-            return {
-              id: modDoc.id,
-              ...modDoc.data(),
-              lessons: lessonsSnapshot.docs.map(lDoc => ({ id: lDoc.id, ...lDoc.data() }))
-            } as Module;
-          }));
-          setModules(modulesData);
-        }
+        const response = await api.get(`/courses/${id}`);
+        setCourse(response.data);
+        // Note: Modules are mocked for now as they are not in schema yet
+        setModules([]);
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `courses/${id}`);
+        console.error("Failed to fetch course details", error);
       } finally {
         setLoading(false);
       }
@@ -89,17 +76,17 @@ export default function CourseDetails() {
       return;
     }
 
-    const q = query(
-      collection(db, "progress"),
-      where("userId", "==", user.uid),
-      where("courseId", "==", id)
-    );
+    const checkEnrollment = async () => {
+      try {
+        const response = await api.get("/enrollments");
+        const isEnrolled = response.data.some((e: any) => e.courseId === id);
+        setEnrollmentStatus(isEnrolled ? "enrolled" : "not-enrolled");
+      } catch (error) {
+        setEnrollmentStatus("not-enrolled");
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setEnrollmentStatus(snapshot.empty ? "not-enrolled" : "enrolled");
-    });
-
-    return () => unsubscribe();
+    checkEnrollment();
   }, [user, id]);
 
   const handleEnroll = async () => {
@@ -113,17 +100,11 @@ export default function CourseDetails() {
 
     setIsEnrolling(true);
     try {
-      await addDoc(collection(db, "progress"), {
-        userId: user.uid,
-        courseId: id,
-        completedLessons: [],
-        lastAccessedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      });
+      await api.post("/enrollments", { courseId: id });
       toast.success("Enrolled successfully! Redirecting to classroom...");
       navigate(`/course/${id}/learn`);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "progress");
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Enrollment failed");
     } finally {
       setIsEnrolling(false);
     }

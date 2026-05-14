@@ -14,18 +14,22 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/lib/store";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
+import api from "@/lib/api";
 import { useState } from "react";
 
 export default function Navbar() {
-  const { user, profile } = useAuthStore();
+  const { user, profile, setUser } = useAuthStore();
   const navigate = useNavigate();
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/");
+    try {
+      await api.post("/auth/logout");
+      setUser(null);
+      navigate("/");
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
   };
 
   return (

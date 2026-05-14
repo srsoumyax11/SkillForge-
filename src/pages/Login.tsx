@@ -1,8 +1,7 @@
-import * as React from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import api from "@/lib/api";
+import { useAuthStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,31 +13,26 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { setUser } = useAuthStore();
   const navigate = useNavigate();
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const response = await api.post("/auth/login", { email, password });
+      setUser(response.data.user);
       toast.success("Logged in successfully!");
       navigate("/dashboard");
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.error || "Login failed");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      toast.success("Logged in with Google!");
-      navigate("/dashboard");
-    } catch (error: any) {
-      toast.error(error.message);
-    }
+  const handleGoogleLogin = () => {
+    toast.info("Google login is currently disabled.");
   };
 
   return (
@@ -49,23 +43,18 @@ export default function Login() {
           <CardDescription>Login to access your courses and progress</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" className="w-full h-11" onClick={handleGoogleLogin}>
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" className="w-4 h-4 mr-2" alt="Google" />
-              Google
-            </Button>
-            <Button variant="outline" className="w-full h-11">
-              <Github className="w-4 h-4 mr-2" />
-              GitHub
-            </Button>
-          </div>
-          
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
+          <div className="hidden">
+            <div className="grid grid-cols-2 gap-4">
+              {/* OAuth buttons hidden during migration */}
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+              </div>
             </div>
           </div>
 

@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/lib/firebase";
+import api from "@/lib/api";
 
 interface Course {
   id: string;
@@ -26,21 +25,18 @@ export default function Courses() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    const q = query(collection(db, "courses"), orderBy("createdAt", "desc"));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const courseData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Course[];
-      setCourses(courseData);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "courses");
-      setLoading(false);
-    });
+    const fetchCourses = async () => {
+      try {
+        const response = await api.get("/courses");
+        setCourses(response.data);
+      } catch (error) {
+        console.error("Failed to fetch courses", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchCourses();
   }, []);
 
   const filteredCourses = courses.filter(course => 
